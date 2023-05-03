@@ -3,12 +3,15 @@ package me.void514.finitefieldconnplugin.ui;
 import me.void514.finitefieldconnplugin.game.*;
 import me.void514.finitefieldconnplugin.menu.Menu;
 import org.bukkit.Material;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 public class BoardMenu extends Menu {
     public enum EnumBoardState {
@@ -19,15 +22,18 @@ public class BoardMenu extends Menu {
     public static final Point GRID_START = new Point(0, 2);
     public static final Point RESET_BUTTON = new Point(5, 8);
     public static final ItemStack RESET_STACK = new ItemStack(Material.BARRIER);
+    public static final Point TRANSFORM_START = new Point(2, 0);
     public static final ItemStack TRANSFORM_STACK = new ItemStack(Material.ENDER_PEARL);
+    public static final ItemStack TRANSFORM_STACK_ACTIVE = new ItemStack(Material.EYE_OF_ENDER);
     private Map<Player, EnumState> playerStates = new HashMap<>();
     private final GameLogic gameLogic;
     private EnumBoardState boardState;
     private EnumState nextState = null;
+    private int alpha = 1;
     public BoardMenu() {
         super(null, 9 * 6);
         System.out.println("Creating board");
-        this.createHandlers();
+        this.resetHandlers();
         this.gameLogic = new GameLogic(PRIME);
         this.setBoardState(EnumBoardState.WAITING);
         if (this.hasEnoughPlayers()) {
@@ -97,27 +103,35 @@ public class BoardMenu extends Menu {
         else return FpUtil.normalize(PRIME, pos.getY() * FpUtil.invert(PRIME, pos.getX()));
     }
 
-    private static int getIndex(FpP2Pos pos) {
+    private final Map<FpP2Pos, Consumer<InventoryClickEvent>> handlerCache = new HashMap<>();
+    private Consumer<InventoryClickEvent> getHandlerAt(FpP2Pos pos) {
+        if (handlerCache.containsKey(pos)) return handlerCache.get(pos);
+        Consumer<InventoryClickEvent> handler = (event -> {
+            if (gameLogic == null) return;
+            EnumState state = playerStates.get((Player) event.getWhoClicked());
+            if (state == null || state != nextState) return;
+            if (gameLogic.getStateAt(pos) == null) {
+                flipState();
+                FpP2Line victoryLine = gameLogic.setStateWithCheck(pos, state);
+                this.setItem(getIndex(pos), EnumState.getDisplayItem(state));
+                if (victoryLine != null) {
+                    for (FpP2Pos linePos: victoryLine) {
+                        if (gameLogic.getStateAt(linePos) == state) {
+                            this.setItem(getIndex(linePos), state.getHighlightItem());
+                        }
+                    }
+                    setBoardState(EnumBoardState.COMPLETE);
+                }
+            }
+        });
+        handlerCache.put(pos, handler);
+        return handler;
+    }
+
+    private int getIndex(FpP2Pos pos) {
         if (pos.getPrime() != PRIME) return 0;
-        /*
-        FpP2Pos normal = pos.normalize();
-        if (pos.getZ() != 0) {
-            int x = FpUtil.normalize(PRIME, normal.getX());
-            int y = FpUtil.normalize(PRIME, normal.getY());
-            // finite point
-            return slotFor(GRID_START.x + x + 1, GRID_START.y + y);
-        } else if (pos.getY() != 0) {
-            // slope point
-            // x = ay, (a, 1, 0)
-            int a = FpUtil.normalize(PRIME, normal.getX());
-            return slotFor(GRID_START.x + a + 1, GRID_START.y + PRIME);
-        } else {
-            return slotFor(GRID_START.x, GRID_START.y + PRIME);
-        }
-         */
-        final int INVALID = 114514;
         int x, y;
-        x = y = INVALID;
+        pos = pos.yScale(alpha);
         pos = pos.deepNormalize();
         if (pos.getZ() != 0) {
             x = GRID_START.x + 1 + (PRIME - 1 - pos.getY());
@@ -146,18 +160,24 @@ public class BoardMenu extends Menu {
             } else {
                 int slope = slopeFor(pos);
                 if (slope != FpUtil.INFINITY) {
-                    slope = slope == 0 ? 10 : slope;
                     getForceNames()[getIndex(pos)] = "Infinite point " + normal.toString()
                             + ", slope = " + slope;
-                    getForceAmounts()[getIndex(pos)] = slope;
+                    getForceAmounts()[getIndex(pos)] = slope == 0 ? 10 : slope;
                 } else {
                     getForceNames()[getIndex(pos)] = "Infinite point " + normal.toString()
                             + ", slope = infinity";
                     getForceAmounts()[getIndex(pos)] = 8;
                 }
             }
-            setItem(getIndex(pos), EnumState.NULL_STACK);
+            setItem(getIndex(pos), EnumState.getDisplayItem(gameLogic.getStateAt(pos)));
         }
+        for (int a = 1; a <= PRIME - 1; a ++) {
+            int slot = slotFor(TRANSFORM_START.x + a - 1, TRANSFORM_START.y);
+            getForceNames()[slot] = "Apply automorphism: [x : y : z] |-> [" + a + "x : y : z]";
+            getForceAmounts()[slot] = a;
+            setItem(slot, TRANSFORM_STACK);
+        }
+        setItem(slotFor(TRANSFORM_START.x + alpha - 1, TRANSFORM_START.y), TRANSFORM_STACK_ACTIVE);
     }
 
     private void flipState() {
@@ -167,26 +187,9 @@ public class BoardMenu extends Menu {
         }
     }
 
-    private void createHandlers() {
+    private void resetHandlers() {
         for (FpP2Pos pos: FpP2Pos.allPointsForPrime(PRIME)) {
-            this.bindClickEventHandler(getIndex(pos), (event -> {
-                if (gameLogic == null) return;
-                EnumState state = playerStates.get((Player) event.getWhoClicked());
-                if (state == null || state != nextState) return;
-                if (gameLogic.getStateAt(pos) == null) {
-                    flipState();
-                    FpP2Line victoryLine = gameLogic.setStateWithCheck(pos, state);
-                    this.setItem(getIndex(pos), EnumState.getDisplayItem(state));
-                    if (victoryLine != null) {
-                        for (FpP2Pos linePos: victoryLine) {
-                            if (gameLogic.getStateAt(linePos) == state) {
-                                this.setItem(getIndex(linePos), state.getHighlightItem());
-                            }
-                        }
-                        setBoardState(EnumBoardState.COMPLETE);
-                    }
-                }
-            }));
+            this.bindClickEventHandler(getIndex(pos), getHandlerAt(pos));
             this.setHandlerActiveAtSlot(getIndex(pos), true);
         }
         this.bindClickEventHandler(slotFor(RESET_BUTTON), (event -> {
@@ -195,9 +198,19 @@ public class BoardMenu extends Menu {
                 this.setBoardState(EnumBoardState.RUNNING);
             }
         }));
-        this.bindMenuClosedHandler(event -> {
-            onPlayerLeave((Player) event.getPlayer());
-        });
+        for (int a = 1; a <= PRIME - 1; a ++) {
+            int slot = slotFor(TRANSFORM_START.x + a - 1, TRANSFORM_START.y);
+            final int finalA = a;
+            this.bindClickEventHandler(slot, event -> {
+                setItem(slotFor(TRANSFORM_START.x + alpha - 1, TRANSFORM_START.y), TRANSFORM_STACK);
+                alpha = finalA;
+                setItem(slotFor(TRANSFORM_START.x + finalA - 1, TRANSFORM_START.y), TRANSFORM_STACK_ACTIVE);
+                resetItems();
+                resetHandlers();
+            });
+            this.setHandlerActiveAtSlot(slot, true);
+        }
+        this.bindMenuClosedHandler(event -> onPlayerLeave((Player) event.getPlayer()));
     }
 
     public Map<Player, EnumState> getPlayerStates() {

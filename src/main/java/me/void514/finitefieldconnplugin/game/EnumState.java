@@ -3,15 +3,15 @@ package me.void514.finitefieldconnplugin.game;
 import org.bukkit.DyeColor;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.material.Dye;
 
 public enum EnumState {
-    CROSS("cross", new ItemStack(Material.REDSTONE), new ItemStack(Material.REDSTONE_BLOCK)),
-    CIRCLE("circle", new ItemStack(Material.EMERALD), new ItemStack(Material.EMERALD_BLOCK));
+    CROSS("cross", new ItemStack(Material.REDSTONE), new ItemStack(Material.REDSTONE_BLOCK), DyeColor.RED),
+    CIRCLE("circle", new ItemStack(Material.EMERALD), new ItemStack(Material.EMERALD_BLOCK), DyeColor.LIME);
 
     private final String name;
     private final ItemStack item;
     private final ItemStack highlightItem;
+    private final DyeColor stainColor;
     public static final ItemStack NULL_STACK = new ItemStack(Material.STAINED_GLASS);
 
     /*
@@ -20,10 +20,11 @@ public enum EnumState {
     }
      */
 
-    EnumState(String name, ItemStack item, ItemStack highlightItem) {
+    EnumState(String name, ItemStack item, ItemStack highlightItem, DyeColor stainColor) {
         this.name = name;
         this.item = item;
         this.highlightItem = highlightItem;
+        this.stainColor = stainColor;
     }
 
     public String getName() {
@@ -50,5 +51,9 @@ public enum EnumState {
 
     public ItemStack getHighlightItem() {
         return highlightItem;
+    }
+
+    public DyeColor getStainColor() {
+        return stainColor;
     }
 }

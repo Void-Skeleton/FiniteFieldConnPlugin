@@ -1,6 +1,8 @@
 package me.void514.finitefieldconnplugin.game;
 
 import java.util.Iterator;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class GameLogic {
 
@@ -22,15 +24,15 @@ public class GameLogic {
 
     private boolean checkLine(FpP2Line line, EnumState state) {
         int currentCount = 0;
-        int oppositeCount = 0;
+//        int oppositeCount = 0;
         for (FpP2Pos pos: line) {
             EnumState state1 = getStateAt(pos);
             if (state1 == state) currentCount ++;
-            else if (state1 != null) oppositeCount ++;
+//            else if (state1 != null) oppositeCount ++;
             System.out.println("Checked point " + pos + ", state = " + state1);
         }
-        System.out.printf("Current count = %d, opposite count = %d\n", currentCount, oppositeCount);
-        return currentCount >= 5 && oppositeCount == 0;
+//        System.out.printf("Current count = %d, opposite count = %d\n", currentCount, oppositeCount);
+        return currentCount >= 5;
     }
 
     /**
