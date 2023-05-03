@@ -1,0 +1,3 @@
+name: FFCon
+version: '${version}'
+main: me.void514.finitefieldconnplugin.FFCon
